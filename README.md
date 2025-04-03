@@ -1,6 +1,6 @@
 <div align="center">
 
-# Authed
+# Authed Identity
 
 **Identity and authentication for AI Agents**
 
