@@ -11,7 +11,7 @@
 
 Authed | [Docs](https://docs.getauthed.dev)
 
-Authed Identity was moved from the old [Authed](https://github.com/authed-dev/authed) repository, Authed 2.0 coming soon!
+> **Note**: Authed Identity was moved from the old [Authed](https://github.com/authed-dev/authed) repository, Authed 2.0 coming soon!
 </div>
 
 ## Overview
