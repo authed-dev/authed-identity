@@ -4,7 +4,7 @@ This migration modifies the providers table to make the name column nullable,
 aligning with the updated Pydantic models where name is optional.
 """
 
-from sqlalchemy import MetaData, Table, Column, String
+from sqlalchemy import MetaData, Table, Column, String, text
 from sqlalchemy.engine import Engine
 
 from ...db import engine
@@ -20,7 +20,7 @@ def upgrade(engine: Engine):
     # Modify the name column to be nullable
     with engine.begin() as connection:
         connection.execute(
-            f'ALTER TABLE {providers.name} ALTER COLUMN name DROP NOT NULL'
+            text('ALTER TABLE providers ALTER COLUMN name DROP NOT NULL')
         )
 
 def downgrade(engine: Engine):
@@ -35,11 +35,11 @@ def downgrade(engine: Engine):
     with engine.begin() as connection:
         # First set any NULL values to a default value to avoid constraint violation
         connection.execute(
-            f"UPDATE {providers.name} SET name = 'unnamed-provider-' || id WHERE name IS NULL"
+            text("UPDATE providers SET name = 'unnamed-provider-' || id WHERE name IS NULL")
         )
         # Then add the NOT NULL constraint
         connection.execute(
-            f'ALTER TABLE {providers.name} ALTER COLUMN name SET NOT NULL'
+            text('ALTER TABLE providers ALTER COLUMN name SET NOT NULL')
         )
 
 def run_migration():
