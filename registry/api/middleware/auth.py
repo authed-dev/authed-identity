@@ -18,7 +18,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Skip auth for public endpoints
         public_paths = [
             "/health",
-            "/agents/register"  # Keep agent registration public
+            "/agents/register",  # Keep agent registration public
+            "/providers/register"  # Keep provider registration public
         ]
         
         path = request.url.path
