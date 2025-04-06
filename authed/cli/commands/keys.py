@@ -24,6 +24,18 @@ def generate_keys(ctx, output: Optional[str], no_update_env: bool):
         # Generate new key pair
         keypair = generate_keypair()
         
+        # Always print the keys to terminal
+        click.echo("\n" + "=" * 60)
+        click.echo(click.style("Generated Keys", fg="blue", bold=True))
+        click.echo("=" * 60 + "\n")
+        
+        click.echo(click.style("Public Key:", bold=True))
+        click.echo(click.style(keypair.public_key, fg="bright_black"))
+        
+        click.echo("\n" + click.style("Private Key:", bold=True) + click.style(" (Keep this secure!)", fg="yellow"))
+        click.echo(click.style(keypair.private_key, fg="bright_black"))
+        click.echo()
+        
         if output:
             # Save to file
             output_path = Path(output)
@@ -31,13 +43,25 @@ def generate_keys(ctx, output: Optional[str], no_update_env: bool):
             click.echo(click.style("✓", fg="green", bold=True) + f" Keys saved to {click.style(output, fg='blue')}")
             
         if not no_update_env:
-            # Update .env file
-            from dotenv import load_dotenv
-            import os
-            from pathlib import Path
+            # Check existing keys in .env
+            env_file = Path('.env')
+            has_valid_keys = False
+            
+            if env_file.exists():
+                with env_file.open('r') as f:
+                    content = f.read()
+                    if 'AUTHED_PRIVATE_KEY' in content and 'AUTHED_PUBLIC_KEY' in content:
+                        # Load existing keys
+                        from dotenv import load_dotenv
+                        import os
+                        load_dotenv()
+                        private_key = os.getenv('AUTHED_PRIVATE_KEY')
+                        public_key = os.getenv('AUTHED_PUBLIC_KEY')
+                        if private_key and public_key:
+                            existing_keypair = KeyPair(public_key.strip('"'), private_key.strip('"'))
+                            has_valid_keys = existing_keypair.is_valid()
             
             # Load existing .env content
-            env_file = Path('.env')
             existing_env = {}
             if env_file.exists():
                 with env_file.open('r') as f:
@@ -58,21 +82,13 @@ def generate_keys(ctx, output: Optional[str], no_update_env: bool):
                 for key, value in existing_env.items():
                     if key.startswith('AUTHED_'):
                         f.write(f"{key}={value}\n")
-                        
-            click.echo(click.style("✓", fg="green", bold=True) + " Updated keys in .env file")
             
-        if not output and no_update_env:
-            # Print to console only if not saving to file and not updating .env
-            click.echo("\n" + "=" * 60)
-            click.echo(click.style("Generated Keys", fg="blue", bold=True))
-            click.echo("=" * 60 + "\n")
+            if has_valid_keys:
+                click.echo(click.style("✓", fg="green", bold=True) + " Updated existing keys in .env file")
+            else:
+                click.echo(click.style("✓", fg="green", bold=True) + " Added new keys to .env file")
             
-            click.echo(click.style("Public Key:", bold=True))
-            click.echo(click.style(keypair.public_key, fg="bright_black"))
-            
-            click.echo("\n" + click.style("Private Key:", bold=True) + click.style(" (Keep this secure!)", fg="yellow"))
-            click.echo(click.style(keypair.private_key, fg="bright_black"))
-            click.echo()
+        click.echo(f"\n{click.style('Note:', fg='yellow', bold=True)} Add .env to your .gitignore file")
             
     except Exception as e:
         click.echo(click.style("✗ Error: ", fg="red", bold=True) + str(e), err=True)
