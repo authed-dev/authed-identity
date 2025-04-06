@@ -30,7 +30,9 @@ def validate_public_key(key: str) -> str:
     if not key or not isinstance(key, str):
         raise ValueError("Invalid public key")
         
-    key = key.strip()
+    # Strip quotes and whitespace
+    key = key.strip('"\' ')
+    
     if not (KEY_MIN_LENGTH <= len(key) <= KEY_MAX_LENGTH):
         raise ValueError(f"Public key must be between {KEY_MIN_LENGTH} and {KEY_MAX_LENGTH} characters")
         

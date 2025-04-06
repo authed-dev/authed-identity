@@ -211,7 +211,9 @@ async def setup(ctx, provider_id: Optional[str], provider_secret: Optional[str])
 
     # Generate keys
     from ..commands.keys import generate_keypair
-    public_key, private_key = generate_keypair()
+    key_pair = generate_keypair()
+    public_key = key_pair.public_key
+    private_key = key_pair.private_key
 
     # Initialize auth with saved config
     from ..auth import CLIAuth
@@ -272,7 +274,9 @@ async def setup(ctx, provider_id: Optional[str], provider_secret: Optional[str])
     # Generate new keys if needed
     if not has_valid_keys:
         from ..commands.keys import generate_keypair
-        public_key, private_key = generate_keypair()
+        key_pair = generate_keypair()
+        public_key = key_pair.public_key
+        private_key = key_pair.private_key
         click.echo(click.style("✓", fg="green") + " Generated new key pair (existing keys were invalid)")
     else:
         # Use existing keys
