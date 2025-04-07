@@ -132,8 +132,11 @@ class ProviderService:
         """Update a provider's details"""
         db = SessionLocal()
         try:
+            # Convert UUID to string for database query
+            provider_id_str = str(provider_id)
+            
             provider = db.query(ProviderDB).filter(
-                ProviderDB.id == provider_id
+                ProviderDB.id == provider_id_str
             ).first()
             if not provider:
                 raise ValueError(f"Provider {provider_id} not found")
@@ -149,9 +152,9 @@ class ProviderService:
             log_service.log_event(
                 "provider_update",
                 {
-                    "actor_id": provider_id,  # The provider making the change
+                    "actor_id": provider_id_str,  # The provider making the change
                     "resource_type": "provider",
-                    "resource_id": provider_id,
+                    "resource_id": provider_id_str,
                     "fields_updated": safe_update_data
                 },
                 level=LogLevel.INFO
@@ -171,7 +174,7 @@ class ProviderService:
                 {
                     "error_details": {
                         "message": str(e),
-                        "provider_id": provider_id,
+                        "provider_id": str(provider_id),
                         "fields_attempted": {
                             "name": updates.name is not None,
                             "contact_email": updates.contact_email is not None,
@@ -189,8 +192,11 @@ class ProviderService:
         """Get provider by ID"""
         db = SessionLocal()
         try:
+            # Convert UUID to string for database query
+            provider_id_str = str(provider_id)
+            
             provider = db.query(ProviderDB).filter(
-                ProviderDB.id == provider_id
+                ProviderDB.id == provider_id_str
             ).first()
             
             if provider:
@@ -211,16 +217,19 @@ class ProviderService:
         """Get all agents for a provider"""
         db = SessionLocal()
         try:
+            # Convert UUID to string for database query
+            provider_id_str = str(provider_id)
+            
             # First check if the provider exists
             provider = db.query(ProviderDB).filter(
-                ProviderDB.id == provider_id
+                ProviderDB.id == provider_id_str
             ).first()
             
             log_service.log_event(
                 "provider_agents_debug",
                 {
                     "step": "checking_provider",
-                    "provider_id": provider_id,
+                    "provider_id": provider_id_str,
                     "provider_exists": provider is not None
                 },
                 level=LogLevel.INFO
@@ -231,14 +240,14 @@ class ProviderService:
             
             # Query agents (provider_id is already a string)
             agents = db.query(AgentDB).filter(
-                AgentDB.provider_id == provider_id
+                AgentDB.provider_id == provider_id_str
             ).all()
             
             log_service.log_event(
                 "provider_agents_debug",
                 {
                     "step": "querying_agents",
-                    "provider_id": provider_id,
+                    "provider_id": provider_id_str,
                     "agent_count": len(agents)
                 },
                 level=LogLevel.INFO
@@ -258,8 +267,11 @@ class ProviderService:
         """Get provider dashboard stats"""
         db = SessionLocal()
         try:
+            # Convert UUID to string for database query
+            provider_id_str = str(provider_id)
+            
             provider = db.query(ProviderDB).filter(
-                ProviderDB.id == provider_id
+                ProviderDB.id == provider_id_str
             ).first()
             
             if not provider:
@@ -267,13 +279,13 @@ class ProviderService:
 
             # Get agent counts
             agents = db.query(AgentDB).filter(
-                AgentDB.provider_id == provider_id
+                AgentDB.provider_id == provider_id_str
             ).all()
             
             
             # Get recent interactions from logs
             recent_events = db.query(SecurityEvent).filter(
-                SecurityEvent.details.op('->>')('provider_id') == provider_id
+                SecurityEvent.details.op('->>')('provider_id') == provider_id_str
             ).order_by(
                 SecurityEvent.timestamp.desc()
             ).limit(10).all()

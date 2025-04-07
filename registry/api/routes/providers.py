@@ -58,13 +58,16 @@ async def patch_provider(
     2. Provider authentication (provider-secret header) - can only update their own details
     """
     try:
+        # Convert provider_id to string for consistent comparison
+        provider_id_str = str(provider_id)
+        
         # Auth is handled by middleware - if we get here, we're authenticated
         # Check if it's provider auth by looking for provider in request state
         provider = getattr(request.state, 'provider', None)
         auth_method = "provider_auth" if provider else "internal_api"
         
         # If using provider auth, verify they're updating their own details
-        if provider and str(provider.id) != str(provider_id):
+        if provider and str(provider.id) != provider_id_str:
             raise HTTPException(
                 status_code=403,
                 detail="Providers can only update their own details"
@@ -81,7 +84,7 @@ async def patch_provider(
         audit_logger.log_event(
             event_type=AuditAction.PROVIDER_UPDATE.value,
             details={
-                "provider_id": provider_id,
+                "provider_id": provider_id_str,
                 "auth_method": auth_method,
                 "fields_updated": safe_update_data
             }
@@ -97,7 +100,7 @@ async def patch_provider(
             event_type=AuditAction.PROVIDER_UPDATE.value,
             details={
                 "error": str(e),
-                "provider_id": provider_id,
+                "provider_id": str(provider_id),
                 "fields_attempted": {
                     "name": updates.name is not None,
                     "contact_email": updates.contact_email is not None,
@@ -116,7 +119,7 @@ async def patch_provider(
             event_type=AuditAction.PROVIDER_UPDATE.value,
             details={
                 "error": str(e),
-                "provider_id": provider_id,
+                "provider_id": str(provider_id),
                 "fields_attempted": {
                     "name": updates.name is not None,
                     "contact_email": updates.contact_email is not None,
