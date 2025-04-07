@@ -68,6 +68,29 @@ class AuditAction(str, Enum):
 class AuditLogger:
     def __init__(self):
         self.settings = get_settings()
+        
+    def _sanitize_details(self, details: Dict[str, Any]) -> Dict[str, Any]:
+        """Sanitize details to make sure they are JSON serializable.
+        Specifically converts UUID objects to strings."""
+        if not details:
+            return {}
+            
+        result = {}
+        for key, value in details.items():
+            if isinstance(value, uuid.UUID):
+                result[key] = str(value)
+            elif isinstance(value, dict):
+                result[key] = self._sanitize_details(value)
+            elif isinstance(value, list):
+                result[key] = [
+                    self._sanitize_details(item) if isinstance(item, dict) else
+                    str(item) if isinstance(item, uuid.UUID) else
+                    item
+                    for item in value
+                ]
+            else:
+                result[key] = value
+        return result
 
     def log_event(
         self,
@@ -78,12 +101,15 @@ class AuditLogger:
         actor_id: Optional[str] = None
     ) -> None:
         """Log an event"""
+        # Sanitize details to ensure all UUIDs are converted to strings
+        sanitized_details = self._sanitize_details(details)
+        
         self._log_event(
             event_type=event_type,
             actor_id=actor_id,
             category=category,
             severity=severity,
-            details=details
+            details=sanitized_details
         )
 
     def log_security_event(
@@ -95,12 +121,15 @@ class AuditLogger:
         level: LogLevel = LogLevel.INFO
     ) -> None:
         """Log a security-related event"""
+        # Sanitize details to ensure all UUIDs are converted to strings
+        sanitized_details = self._sanitize_details(details)
+        
         self._log_event(
             event_type=action,
             actor_id=actor_id,
             category=AuditCategory.SECURITY,
             severity=severity,
-            details=details
+            details=sanitized_details
         )
 
     def log_data_access(
@@ -113,6 +142,9 @@ class AuditLogger:
         details: Optional[Dict[str, Any]] = None
     ) -> None:
         """Log data access events"""
+        # Sanitize details to ensure all UUIDs are converted to strings
+        sanitized_details = self._sanitize_details(details or {})
+        
         self._log_event(
             event_type=action,
             actor_id=actor_id,
@@ -122,7 +154,7 @@ class AuditLogger:
                 "resource_type": resource_type,
                 "resource_id": resource_id,
                 "access_type": access_type,
-                **(details or {})
+                **sanitized_details
             }
         )
 
@@ -138,6 +170,10 @@ class AuditLogger:
         event_id = str(uuid.uuid4())
         timestamp = datetime.now(timezone.utc)
         
+        # Ensure actor_id is a string if it's a UUID
+        if isinstance(actor_id, uuid.UUID):
+            actor_id = str(actor_id)
+        
         event_details = {
             "event_id": event_id,
             "timestamp": timestamp.isoformat(),
@@ -152,6 +188,7 @@ class AuditLogger:
             log_entry = SecurityEvent(
                 timestamp=timestamp,
                 event_type=event_type,
+                actor_id=actor_id,
                 details=event_details,
                 is_error=severity in [AuditSeverity.ERROR, AuditSeverity.CRITICAL]
             )
