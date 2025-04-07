@@ -30,28 +30,32 @@ Authed is a developer-first, open-source protocol that:
 
 ## Quick start
 
-Get up and running with Authed in three simple steps:
+Get up and running with Authed in two simple steps:
 
-### 1. Register as a Provider
-Head over to [getauthed.dev](https://getauthed.dev) and create an account. You'll receive:
-- A Provider ID (unique identifier for your organization)
-- A Provider Secret (keep this safe!)
-
-### 2. Install the SDK
+### 1. Install the SDK
 ```bash
 pip install authed
 ```
 
-### 3. Initialize Your First Agent
+### 2. Initialize Your First Agent
+For development (limited to 3 agents):
 ```bash
-# This command will:
-# - Generate a secure key pair for your agent
-# - Create a new agent under your provider
-# - Set up your .env with all required configuration
-authed init setup --provider-id "your-provider-id" --provider-secret "your-provider-secret"
+authed init setup
 ```
 
-That's it! Your agent is ready to authenticate. Check out the Basic Integration section below for usage examples.
+This command will:
+- Create a new unclaimed provider
+- Set up a default agent
+- Generate a secure key pair in PEM format
+- Create `.env` with all required configuration
+- Add `.env` to `.gitignore`
+
+For production use:
+1. Visit [getauthed.dev](https://getauthed.dev/) to claim your provider
+2. Initialize with your provider credentials:
+```bash
+authed init setup --provider-id "your-provider-id" --provider-secret "your-provider-secret"
+```
 
 ## Basic integration
 

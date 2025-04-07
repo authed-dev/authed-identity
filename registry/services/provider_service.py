@@ -415,4 +415,39 @@ class ProviderService:
             )
             raise
         finally:
+            db.close()
+
+    def check_agent_limit(self, provider_id: str) -> bool:
+        """Check if provider has reached their agent limit
+        
+        Args:
+            provider_id: The provider ID to check
+            
+        Returns:
+            bool: True if provider can create more agents, False if limit reached
+            
+        Raises:
+            ValueError: If provider not found
+        """
+        db = SessionLocal()
+        try:
+            provider = db.query(ProviderDB).filter(
+                ProviderDB.id == provider_id
+            ).first()
+            
+            if not provider:
+                raise ValueError(f"Provider {provider_id} not found")
+                
+            # If provider is claimed, no limit
+            if provider.claimed:
+                return True
+                
+            # For unclaimed providers, check agent count
+            agent_count = db.query(func.count(AgentDB.agent_id)).filter(
+                AgentDB.provider_id == provider_id
+            ).scalar()
+            
+            return agent_count < 3  # Limit of 3 agents for unclaimed providers
+            
+        finally:
             db.close() 

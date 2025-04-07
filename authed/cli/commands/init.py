@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Optional
 from ..utils import async_command
+import requests
 
 CONFIG_DIR = Path.home() / '.authed'
 CONFIG_FILE = CONFIG_DIR / 'config.json'
@@ -164,12 +165,40 @@ def clear_config(force: bool):
     click.echo()
 
 @group.command(name='setup')
-@click.option('--provider-id', required=True, help='Provider ID from registration')
-@click.option('--provider-secret', required=True, help='Provider secret from registration')
+@click.option('--provider-id', help='Provider ID (optional - will create unclaimed provider if not provided)')
+@click.option('--provider-secret', help='Provider secret (optional - will create unclaimed provider if not provided)')
 @click.pass_context
 @async_command
-async def setup(ctx, provider_id: str, provider_secret: str):
-    """Quick setup: configure provider, create agent, and set up environment."""
+async def setup(ctx, provider_id: Optional[str], provider_secret: Optional[str]):
+    """Quick setup: configure provider, create agent, and set up environment.
+    
+    There are two ways to use this command:
+    
+    1. Unclaimed Provider (Limited Capabilities):
+       Run without parameters: authed init setup
+       This creates a new unclaimed provider with limited capabilities.
+       
+    2. Claimed Provider (Full Capabilities):
+       Run with provider credentials: authed init setup --provider-id "your-id" --provider-secret "your-secret"
+       This uses an existing claimed provider with full capabilities.
+    """
+    # Create unclaimed provider if credentials not provided
+    if not provider_id or not provider_secret:
+        click.echo("\n" + click.style("Creating unclaimed provider...", fg="blue"))
+        try:
+            response = requests.post(
+                "https://api.getauthed.dev/providers/register",
+                headers={"Content-Type": "application/json"},
+                json={}
+            )
+            response.raise_for_status()
+            result = response.json()
+            provider_id = result['id']
+            provider_secret = result['provider_secret']
+            click.echo(click.style("✓", fg="green") + " Provider created successfully")
+        except requests.exceptions.RequestException as e:
+            raise click.UsageError(f"Failed to create provider: {str(e)}")
+
     # Save provider config
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     config = {
@@ -182,7 +211,9 @@ async def setup(ctx, provider_id: str, provider_secret: str):
 
     # Generate keys
     from ..commands.keys import generate_keypair
-    public_key, private_key = generate_keypair()
+    key_pair = generate_keypair()
+    public_key = key_pair.public_key
+    private_key = key_pair.private_key
 
     # Initialize auth with saved config
     from ..auth import CLIAuth
@@ -223,17 +254,51 @@ async def setup(ctx, provider_id: str, provider_secret: str):
                     key, value = line.split('=', 1)
                     existing_env[key.strip()] = value.strip()
     
-    # Update with new values
+    # Check if we have valid key pair
+    def is_valid_key(key: str) -> bool:
+        key = key.strip('"\' ')
+        # Basic format check - should have proper PEM headers and content
+        if key.startswith('-----BEGIN') and key.endswith('-----'):
+            # Should have some content between the headers
+            parts = key.split('-----')
+            return len(parts) >= 4 and parts[2].strip()  # Middle part should have content
+        return False
+
+    has_valid_keys = (
+        'AUTHED_PRIVATE_KEY' in existing_env and 
+        'AUTHED_PUBLIC_KEY' in existing_env and
+        is_valid_key(existing_env['AUTHED_PRIVATE_KEY']) and
+        is_valid_key(existing_env['AUTHED_PUBLIC_KEY'])
+    )
+    
+    # Generate new keys if needed
+    if not has_valid_keys:
+        from ..commands.keys import generate_keypair
+        key_pair = generate_keypair()
+        public_key = key_pair.public_key
+        private_key = key_pair.private_key
+        click.echo(click.style("✓", fg="green") + " Generated new key pair (existing keys were invalid)")
+    else:
+        # Use existing keys
+        public_key = existing_env['AUTHED_PUBLIC_KEY'].strip('"\' ')
+        private_key = existing_env['AUTHED_PRIVATE_KEY'].strip('"\' ')
+        click.echo(click.style("→", fg="blue") + " Using existing key pair")
+    
+    # Only add new values if they don't exist
     new_env = {
         'AUTHED_REGISTRY_URL': '"https://api.getauthed.dev"',
+        'AUTHED_PROVIDER_ID': f'"{provider_id}"',
+        'AUTHED_PROVIDER_SECRET': f'"{provider_secret}"',
         'AUTHED_AGENT_ID': f'"{agent_id}"',
         'AUTHED_AGENT_SECRET': f'"{agent_secret}"',
         'AUTHED_PRIVATE_KEY': f'"{private_key}"',
         'AUTHED_PUBLIC_KEY': f'"{public_key}"'
     }
     
-    # Merge existing and new values
-    existing_env.update(new_env)
+    # Update values that don't exist or need updating
+    for key, value in new_env.items():
+        if key not in existing_env or (key in ['AUTHED_PRIVATE_KEY', 'AUTHED_PUBLIC_KEY'] and not has_valid_keys):
+            existing_env[key] = value
     
     # Write back to .env file
     with env_file.open('w') as f:
@@ -252,6 +317,18 @@ async def setup(ctx, provider_id: str, provider_secret: str):
     click.echo("\n" + "=" * 60)
     click.echo(click.style("✓ Setup Complete!", fg="green", bold=True))
     click.echo("=" * 60)
-    click.echo(f"\n{click.style('Agent ID:', bold=True)}     {click.style(agent_id, fg='yellow')}")
-    click.echo(f"{click.style('Environment:', bold=True)}  {click.style('.env', fg='blue')} file created")
+    click.echo(f"\n{click.style('Provider ID:', bold=True)}     {click.style(provider_id, fg='yellow')}")
+    click.echo(f"{click.style('Provider Secret:', bold=True)}  {click.style(provider_secret, fg='yellow')}")
+    click.echo(f"{click.style('Agent ID:', bold=True)}     {click.style(agent_id, fg='yellow')}")
+    click.echo(f"{click.style('Environment:', bold=True)}  {click.style('.env', fg='blue')} file created with all credentials")
+    
+    if not provider_id or not provider_secret:
+        click.echo(f"\n{click.style('Note:', fg='yellow', bold=True)} This is an unclaimed provider with limited capabilities:")
+        click.echo("  - Maximum of 3 agents")
+        click.echo("  - No access to logs")
+        click.echo("\nTo claim this provider and get full access, run:")
+        click.echo(click.style("  authed providers register --name \"Your Name\" --email \"your.email@example.com\"", fg="blue"))
+        click.echo("\nThen use the returned provider ID and secret with:")
+        click.echo(click.style("  authed init setup --provider-id \"your-id\" --provider-secret \"your-secret\"", fg="blue"))
+    
     click.echo(f"\n{click.style('Note:', fg='yellow', bold=True)} Add .env to your .gitignore file") 

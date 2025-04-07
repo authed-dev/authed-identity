@@ -4,7 +4,7 @@ import click
 import json
 from pathlib import Path
 from uuid import UUID
-from .commands import agents, permissions, keys, logs, init
+from .commands import agents, permissions, keys, logs, init, providers
 from .auth import CLIAuth
 
 # Config file location
@@ -95,6 +95,7 @@ cli.add_command(permissions.group)
 cli.add_command(keys.group)
 cli.add_command(logs.group)
 cli.add_command(init.group)
+cli.add_command(providers.group)
 
 if __name__ == '__main__':
     cli() 
